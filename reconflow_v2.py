@@ -59,12 +59,16 @@ def run_subfinder(domain: str, output_dir: Path):
 
 
 def run_httpx(subdomains, output_dir: Path, threads=None, timeout=None,
-              keep_wildcard=False):
+              keep_wildcard=False, headers=None):
     if shutil.which("httpx") is None:
         sys.exit("[!] httpx not found on PATH. Install it from "
                  "https://github.com/projectdiscovery/httpx")
     print("[*] Probing for live hosts...")
     cmd = ["httpx", "-silent", "-json", "-title", "-status-code", "-tech-detect"]
+    if headers:
+        print(f"[*] Custom HTTP headers active ({len(headers)}): " + "; ".join(headers))
+        for h in headers:
+            cmd += ["-H", h]
     if threads:
         cmd += ["-threads", str(threads)]
     if timeout:
@@ -117,6 +121,8 @@ def main():
     ap.add_argument("-o", "--output", default="output")
     ap.add_argument("-c", "--config", help="path to custom config file (e.g., reconflow.yaml)")
     ap.add_argument("--resume", action="store_true", help="resume an interrupted scan")
+    ap.add_argument("-H", "--header", action="append", default=[], metavar="HEADER",
+                    help="custom HTTP header for httpx (repeatable), e.g. -H 'X-Bug-Bounty: user'")
     ap.add_argument("--threads", type=int)
     ap.add_argument("--timeout", type=int)
     ap.add_argument("--json", action="store_true")
@@ -368,7 +374,8 @@ def run_pipeline(domain: str, args) -> dict:
                 pass
     else:
         live_hosts, httpx_records = run_httpx(
-            subdomains, output_dir, args.threads, args.timeout, args.keep_wildcard
+            subdomains, output_dir, args.threads, args.timeout, args.keep_wildcard,
+            headers=args.header
         )
         try:
             (output_dir / "httpx_records.json").write_text(
